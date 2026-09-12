@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>JAL マイル・FOP修行シミュレーター</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0E1B3A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="JAL FOP修行">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=Roboto+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0E1B3A;
+    --navy-deep:#091026;
+    --red:#C8102E;
+    --red-deep:#8E0B21;
+    --gold:#C9973A;
+    --cream:#FBF7EE;
+    --cream-dim:#F1EBDD;
+    --ink:#1B2136;
+    --muted:#6B7280;
+    --line:#E4DCC8;
+    --good:#1E7A4C;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--navy-deep); color:var(--ink);
+    font-family:'Zen Kaku Gothic New', 'Hiragino Sans', sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  #app{ max-width:480px; margin:0 auto; min-height:100vh; background:var(--cream); position:relative; padding-bottom:76px;}
+
+  /* Header */
+  header{
+    background:linear-gradient(160deg,var(--navy) 0%, var(--navy-deep) 100%);
+    color:#fff; padding:22px 20px 26px; position:relative; overflow:hidden;
+  }
+  header::after{
+    content:""; position:absolute; right:-40px; top:-60px; width:180px; height:180px;
+    border-radius:50%; background:radial-gradient(circle at 30% 30%, rgba(200,16,46,.55), rgba(200,16,46,0) 70%);
+  }
+  header .eyebrow{ font-size:11px; letter-spacing:.14em; color:var(--gold); font-weight:700;}
+  header h1{ margin:6px 0 2px; font-size:22px; font-weight:900; line-height:1.3;}
+  header .sub{ font-size:12.5px; color:#C9D2E8; margin-top:2px;}
+  header .member{
+    margin-top:14px; display:flex; justify-content:space-between; align-items:center;
+    background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.16);
+    border-radius:10px; padding:9px 12px; font-size:12px;
+  }
+  header .member b{ font-size:13.5px; }
+  header .tag{
+    font-family:'Roboto Mono',monospace; font-size:11px; padding:3px 8px; border-radius:20px;
+    background:rgba(201,151,58,.22); color:var(--gold); border:1px solid rgba(201,151,58,.4);
+    font-weight:700;
+  }
+
+  /* Sections */
+  .view{ display:none; padding:18px 18px 8px; }
+  .view.active{ display:block; }
+  .card{
+    background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px;
+    margin-bottom:14px; box-shadow:0 1px 0 rgba(0,0,0,.02);
+  }
+  .card h2{ font-size:14px; margin:0 0 12px; display:flex; align-items:center; gap:7px; color:var(--navy);}
+  .card h2 .num{
+    width:20px; height:20px; border-radius:50%; background:var(--red); color:#fff;
+    font-size:11px; display:flex; align-items:center; justify-content:center; font-weight:700; flex-shrink:0;
+  }
+  label{ display:block; font-size:12px; color:var(--muted); margin:10px 0 5px; font-weight:500;}
+  label:first-of-type{ margin-top:0; }
+  select, input[type=text], input[type=number], input[type=date]{
+    width:100%; padding:10px 11px; border:1px solid var(--line); border-radius:9px;
+    font-size:14.5px; background:var(--cream); color:var(--ink); font-family:inherit;
+  }
+  select:focus, input:focus{ outline:2px solid var(--red); outline-offset:1px; }
+  .row2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .swap-row{ display:flex; align-items:end; gap:8px; }
+  .swap-btn{
+    flex-shrink:0; width:38px; height:38px; border-radius:9px; border:1px solid var(--line);
+    background:var(--cream); color:var(--red); font-size:16px; cursor:pointer;
+  }
+  .hint{ font-size:11px; color:var(--muted); margin-top:5px; line-height:1.5;}
+  .hint.warn{ color:var(--red); }
+
+  .btn{
+    display:block; width:100%; text-align:center; padding:13px; border-radius:10px;
+    border:none; font-size:15px; font-weight:700; cursor:pointer; font-family:inherit;
+  }
+  .btn-primary{ background:var(--red); color:#fff; }
+  .btn-primary:active{ background:var(--red-deep); }
+  .btn-ghost{ background:transparent; color:var(--navy); border:1.5px solid var(--navy); }
+  .btn-sub{ background:var(--cream-dim); color:var(--ink); border:1px solid var(--line); font-size:13px; padding:10px;}
+
+  /* Result */
+  .result-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;}
+  .stat{ border-radius:12px; padding:14px 12px; }
+  .stat.mile{ background:#FCEEEF; border:1px solid #F2C6CB;}
+  .stat.fop{ background:#FDF3E2; border:1px solid #EFD79E;}
+  .stat .lbl{ font-size:11.5px; color:var(--muted); font-weight:700; margin-bottom:2px;}
+  .stat .val{ font-family:'Roboto Mono',monospace; font-size:26px; font-weight:700; color:var(--ink); line-height:1.15;}
+  .stat .val small{ font-size:13px; font-weight:500; margin-left:2px; color:var(--muted);}
+  .stat .breakdown{ font-size:11px; color:var(--muted); margin-top:6px; border-top:1px dashed var(--line); padding-top:6px;}
+  .mini-row{ display:flex; gap:10px; margin-bottom:10px;}
+  .mini{ flex:1; background:#EAF6EE; border:1px solid #BFE3CB; border-radius:10px; padding:10px 12px; text-align:center;}
+  .mini .lbl{ font-size:10.5px; color:var(--good); font-weight:700;}
+  .mini .val{ font-family:'Roboto Mono',monospace; font-size:16px; font-weight:700; color:var(--ink);}
+  .mini.price{ background:#EEF0FB; border-color:#CBD1F0; }
+  .mini.price .lbl{ color:#3B4590; }
+
+  /* progress bar */
+  .prog-wrap{ margin-top:4px; }
+  .prog-label{ display:flex; justify-content:space-between; font-size:12px; margin-bottom:6px;}
+  .prog-track{ height:10px; background:var(--cream-dim); border-radius:6px; overflow:hidden; border:1px solid var(--line);}
+  .prog-fill{ height:100%; background:linear-gradient(90deg,var(--red),var(--gold)); border-radius:6px 0 0 6px; }
+
+  /* Tier ladder */
+  .ladder{ display:flex; gap:6px; margin-top:12px;}
+  .tier{ flex:1; text-align:center; padding:8px 3px; border-radius:9px; background:var(--cream-dim); border:1px solid var(--line); font-size:10px;}
+  .tier.reached{ background:#1E2A55; color:#fff; border-color:#1E2A55; }
+  .tier.current{ background:var(--gold); color:#3a2a06; border-color:var(--gold); font-weight:700; }
+  .tier .fop{ font-family:'Roboto Mono',monospace; font-size:9.5px; opacity:.85; margin-top:2px;}
+
+  /* log */
+  .flight-item{
+    border:1px solid var(--line); border-radius:12px; padding:12px 13px; margin-bottom:10px; position:relative;
+    background:#fff;
+  }
+  .flight-item .top{ display:flex; justify-content:space-between; font-size:11px; color:var(--muted); margin-bottom:4px;}
+  .flight-item .route{ font-size:15.5px; font-weight:700; color:var(--navy); }
+  .flight-item .nums{ display:flex; gap:14px; margin-top:8px; }
+  .flight-item .nums div{ font-size:11px; color:var(--muted); }
+  .flight-item .nums b{ display:block; font-family:'Roboto Mono',monospace; font-size:15px; color:var(--ink); }
+  .del-btn{
+    position:absolute; top:10px; right:10px; border:none; background:none; color:#C7CAD6; font-size:16px; cursor:pointer; padding:2px 6px;
+  }
+  .empty{ text-align:center; padding:30px 10px; color:var(--muted); font-size:13px; }
+  .total-bar{
+    background:var(--navy); color:#fff; border-radius:12px; padding:12px 14px; display:flex; justify-content:space-around;
+    margin-bottom:14px; font-size:11px; text-align:center;
+  }
+  .total-bar b{ display:block; font-family:'Roboto Mono',monospace; font-size:16px; margin-top:2px;}
+
+  /* tabs */
+  nav.tabbar{
+    position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:480px;
+    background:#fff; border-top:1px solid var(--line); display:flex; z-index:10;
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  nav.tabbar button{
+    flex:1; background:none; border:none; padding:10px 2px 8px; font-family:inherit;
+    color:var(--muted); font-size:10.5px; display:flex; flex-direction:column; align-items:center; gap:3px; cursor:pointer;
+  }
+  nav.tabbar button .ic{ font-size:19px; }
+  nav.tabbar button.active{ color:var(--red); font-weight:700; }
+
+  .disclaimer{ font-size:10.5px; color:var(--muted); line-height:1.6; padding:6px 4px 4px; }
+  .toast{
+    position:fixed; bottom:86px; left:50%; transform:translateX(-50%); background:var(--navy); color:#fff;
+    padding:10px 18px; border-radius:30px; font-size:13px; opacity:0; transition:opacity .25s; z-index:20; pointer-events:none;
+    max-width:80%; text-align:center;
+  }
+  .toast.show{ opacity:1; }
+  .field-note{ font-size:11px; color:var(--muted); margin-bottom:8px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header>
+    <div class="eyebrow">JAL FLY ON POINT SIMULATOR</div>
+    <h1>マイル・FOP修行<br>シミュレーター</h1>
+    <div class="sub">次のフライトで貯まるマイル・FOPをすぐ計算</div>
+    <div class="member">
+      <div>会員: <b id="memberNameDisplay">—</b></div>
+      <div class="tag" id="memberStatusTag">—</div>
+    </div>
+  </header>
+
+  <!-- CALC VIEW -->
+  <div class="view active" id="view-calc">
+
+    <div class="card">
+      <h2><span class="num">1</span>路線・座席クラス</h2>
+      <div class="swap-row">
+        <div style="flex:1">
+          <label>出発地</label>
+          <select id="fromAirport"></select>
+        </div>
+        <button class="swap-btn" id="swapBtn" title="入替え">⇄</button>
+        <div style="flex:1">
+          <label>目的地</label>
+          <select id="toAirport"></select>
+        </div>
+      </div>
+      <label>区間マイル（片道）</label>
+      <input type="number" id="segMiles" placeholder="路線を選ぶと自動入力">
+      <div class="hint" id="segMilesHint">出発地・目的地を選んでください</div>
+
+      <label>座席クラス</label>
+      <select id="seatClass">
+        <option value="normal">普通席（積算率 50〜100%）</option>
+        <option value="classj">クラスJ（積算率 60〜110%）</option>
+        <option value="first">ファースト（積算率 100〜150%）</option>
+      </select>
+    </div>
+
+    <div class="card">
+      <h2><span class="num">2</span>運賃種別・ステータス・カード</h2>
+      <label>運賃種別</label>
+      <select id="fareType">
+        <option value="fare1">運賃1：フレックス／JALカード割引／ビジネスフレックス（100%）</option>
+        <option value="fare2">運賃2：株主割引（75%）</option>
+        <option value="fare3">運賃3：セイバー／往復セイバー（75%）</option>
+        <option value="fare4">運賃4：スペシャルセイバー（75%）</option>
+        <option value="fare5">運賃5：個人包括旅行運賃（パッケージツアー等）（50%）</option>
+        <option value="fare6">運賃6：プロモーション／スカイメイト（50%）</option>
+      </select>
+      <div class="row2">
+        <div>
+          <label>会員ステータス</label>
+          <select id="statusLv">
+            <option value="general">一般会員（+0%）</option>
+            <option value="jgc">JGC（+35%）</option>
+            <option value="crystal">クリスタル（+55%）</option>
+            <option value="sapphire">サファイア／JGCプレミア（+105%）</option>
+            <option value="diamond">ダイヤモンド（+130%）</option>
+          </select>
+        </div>
+        <div>
+          <label>JALカード</label>
+          <select id="cardLv">
+            <option value="none">カードなし（+0%）</option>
+            <option value="normal">普通/CLUB-EST/Suica（+10%）</option>
+            <option value="premium">CLUB-A以上/ゴールド/プラチナ（+25%）</option>
+          </select>
+        </div>
+      </div>
+      <div class="hint">⚠️ ステータスとカードのボーナスは加算されず、高い方のみが適用されます</div>
+
+      <label>搭乗ボーナスFOP（運賃区分により自動設定／必要なら上書き可）</label>
+      <input type="number" id="bonusFOPInput" placeholder="運賃種別を選ぶと自動入力">
+
+      <label>運賃（円・任意／単価分析用）</label>
+      <input type="number" id="fareYen" placeholder="例）32000">
+
+      <div class="row2">
+        <div>
+          <label>便名（任意）</label>
+          <input type="text" id="flightNo" placeholder="例）JL922">
+        </div>
+        <div>
+          <label>搭乗日</label>
+          <input type="date" id="flightDate">
+        </div>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="calcBtn">計算する</button>
+
+    <div class="card" id="resultCard" style="display:none; margin-top:14px;">
+      <h2><span class="num">3</span>計算結果</h2>
+      <div class="result-grid">
+        <div class="stat mile">
+          <div class="lbl">✈️ 獲得マイル</div>
+          <div class="val" id="resMile">0</div>
+          <div class="breakdown" id="resMileBreak"></div>
+        </div>
+        <div class="stat fop">
+          <div class="lbl">🎯 獲得FOP</div>
+          <div class="val" id="resFOP">0</div>
+          <div class="breakdown" id="resFOPBreak"></div>
+        </div>
+      </div>
+      <div class="mini-row">
+        <div class="mini"><div class="lbl">LSP</div><div class="val" id="resLSP">1</div></div>
+        <div class="mini price" id="priceBox" style="display:none;"><div class="lbl">1マイル/1FOP単価</div><div class="val" id="resPrice">—</div></div>
+      </div>
+      <div class="prog-wrap">
+        <div class="prog-label"><span id="progTierLabel">目標達成まで</span><span id="progPercent">0%</span></div>
+        <div class="prog-track"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+        <div class="hint" id="progRemain"></div>
+      </div>
+      <button class="btn btn-sub" id="saveLogBtn" style="margin-top:14px;">📋 この結果をフライトログに保存</button>
+    </div>
+
+  </div>
+
+  <!-- PROGRESS VIEW -->
+  <div class="view" id="view-progress">
+    <div class="card">
+      <h2>📊 年間FOP進捗</h2>
+      <div class="mini-row">
+        <div class="mini"><div class="lbl">累計FOP</div><div class="val" id="progTotalFOP">0</div></div>
+        <div class="mini"><div class="lbl">累計搭乗回数</div><div class="val" id="progTotalFlights">0</div></div>
+      </div>
+      <label>目標ステータス</label>
+      <select id="targetTier">
+        <option value="crystal">クリスタル（30,000 FOP）</option>
+        <option value="sapphire">サファイア（50,000 FOP）</option>
+        <option value="jgcpremier">JGCプレミア（80,000 FOP）</option>
+        <option value="diamond">ダイヤモンド（100,000 FOP）</option>
+      </select>
+      <div class="prog-wrap">
+        <div class="prog-label"><span id="mainProgLabel">目標まで</span><span id="mainProgPercent">0%</span></div>
+        <div class="prog-track"><div class="prog-fill" id="mainProgFill" style="width:0%"></div></div>
+        <div class="hint" id="mainProgRemain"></div>
+      </div>
+      <div class="ladder" id="ladder"></div>
+    </div>
+
+    <div class="card">
+      <h2>⚙️ 現在値を設定</h2>
+      <div class="field-note">アプリ外（実搭乗分）ですでに獲得しているFOP・搭乗回数のベース値です。ログに保存したフライトはこれに加算されます。</div>
+      <div class="row2">
+        <div>
+          <label>ベースFOP</label>
+          <input type="number" id="baselineFOP">
+        </div>
+        <div>
+          <label>ベース搭乗回数</label>
+          <input type="number" id="baselineFlights">
+        </div>
+      </div>
+      <label>会員名（任意）</label>
+      <input type="text" id="memberNameInput">
+      <label>現在のステータス</label>
+      <select id="currentStatusInput">
+        <option value="general">一般会員</option>
+        <option value="jgc">JGC</option>
+        <option value="crystal">クリスタル</option>
+        <option value="sapphire">サファイア</option>
+        <option value="jgcpremier">JGCプレミア</option>
+        <option value="diamond">ダイヤモンド</option>
+      </select>
+      <button class="btn btn-primary" id="saveSettingsBtn" style="margin-top:12px;">設定を保存</button>
+    </div>
+  </div>
+
+  <!-- LOG VIEW -->
+  <div class="view" id="view-log">
+    <div class="total-bar">
+      <div>フライト数<b id="logCount">0</b></div>
+      <div>合計マイル<b id="logMiles">0</b></div>
+      <div>合計FOP<b id="logFOP">0</b></div>
+    </div>
+    <div id="logList"></div>
+  </div>
+
+  <!-- DATA VIEW -->
+  <div class="view" id="view-data">
+    <div class="card">
+      <h2>📤 CSV書き出し</h2>
+      <div class="field-note">フライトログをExcel等で開けるCSVファイルとして書き出します。</div>
+      <button class="btn btn-primary" id="exportCsvBtn">CSVをダウンロード</button>
+    </div>
+    <div class="card">
+      <h2>🔁 JSONバックアップ</h2>
+      <div class="field-note">端末を変えるときは、JSONを書き出して新しい端末で読み込んでください。</div>
+      <button class="btn btn-ghost" id="exportJsonBtn">JSONを書き出す</button>
+      <label style="margin-top:12px;">JSONを読み込む</label>
+      <input type="file" id="importJsonFile" accept="application/json">
+    </div>
+    <div class="card">
+      <h2>🗑 データ削除</h2>
+      <div class="field-note">フライトログをすべて削除します（元に戻せません）。</div>
+      <button class="btn btn-sub" id="clearLogBtn" style="color:var(--red);">フライトログを全削除</button>
+    </div>
+    <div class="disclaimer">
+      ※本アプリは個人利用のための非公式シミュレーターです。マイルは「区間マイル×積算率(運賃区分+座席クラス)＋ステータス/カードボーナス」、FOPは「区間マイル×2×積算率(運賃区分+座席クラス)＋搭乗ボーナスFOP(運賃区分により固定)」で計算しています。この式は羽田発FOP一覧表の実測値（運賃1〜6・全座席クラス・複数空港）と照合し、一致を確認済みです。ただし離島割引・特定路線割引など一部の運賃、他空港発着の区間マイル、回数基準での達成条件、JGC入会要件（生涯累計1,500 LSP等）は未対応です。正式な数値・達成条件は必ずJAL公式サイト・アプリでご確認ください。
+    </div>
+  </div>
+
+</div>
+
+<nav class="tabbar">
+  <button class="tab-btn active" data-view="calc"><span class="ic">🧮</span>計算</button>
+  <button class="tab-btn" data-view="progress"><span class="ic">🎯</span>進捗</button>
+  <button class="tab-btn" data-view="log"><span class="ic">📋</span>ログ</button>
+  <button class="tab-btn" data-view="data"><span class="ic">💾</span>データ</button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- Static data ----------
+  const AIRPORTS = [
+    {code:'HND', name:'東京(羽田)'},
+    {code:'FUK', name:'福岡'},
+    {code:'CTS', name:'札幌(新千歳)'},
+    {code:'OKA', name:'沖縄(那覇)'},
+    {code:'ISG', name:'石垣'},
+    {code:'MMB', name:'女満別'},
+    {code:'ITM', name:'大阪(伊丹)'},
+    {code:'NGO', name:'名古屋(中部)'},
+    {code:'SDJ', name:'仙台'},
+  ];
+
+  // one-way JAL segment miles (JAL公式区間マイル表より判明分)
+  const SEGMENT_MILES = {
+    // JAL公式「国内線区間マイル表」で確認済みの数値
+    'HND-ITM':280, 'HND-CTS':510, 'HND-NGO':193, 'HND-FUK':567, 'HND-OKA':984, 'HND-MMB':609, 'HND-ISG':1224,
+    'ITM-CTS':666, 'ITM-FUK':287, 'ITM-OKA':739, 'ITM-MMB':797, 'ITM-ISG':969,
+    'NGO-FUK':374, 'NGO-OKA':809, 'NGO-ISG':1044,
+    'FUK-OKA':537, 'FUK-ISG':737,
+    'OKA-ISG':247,
+    'SDJ-OKA':1130,
+    'CTS-MMB':148, 'CTS-NGO':614, 'CTS-FUK':882,
+  };
+
+  const SEAT_CLASS = {
+    normal:{label:'普通席', offset:0},
+    classj:{label:'クラスJ', offset:10},
+    first: {label:'ファースト', offset:50},
+  };
+  // 運賃区分：base=マイル積算率(%)、fopBonus=搭乗ボーナスFOP（羽田発FOP一覧の実測値から逆算し検証済み）
+  const FARE_TYPE = {
+    fare1:{label:'運賃1：フレックス/JALカード割引/ビジネスフレックス', base:100, fopBonus:400},
+    fare2:{label:'運賃2：株主割引', base:75, fopBonus:400},
+    fare3:{label:'運賃3：セイバー/往復セイバー', base:75, fopBonus:200},
+    fare4:{label:'運賃4：スペシャルセイバー', base:75, fopBonus:200},
+    fare5:{label:'運賃5：個人包括旅行運賃（パッケージツアー等）', base:50, fopBonus:0},
+    fare6:{label:'運賃6：プロモーション/スカイメイト', base:50, fopBonus:0},
+  };
+  const STATUS = {
+    general:{label:'一般会員', bonus:0},
+    jgc:{label:'JGC', bonus:35},
+    crystal:{label:'クリスタル', bonus:55},
+    sapphire:{label:'サファイア/JGCプレミア', bonus:105},
+    diamond:{label:'ダイヤモンド', bonus:130},
+  };
+  const CARD = {
+    none:{label:'カードなし', bonus:0},
+    normal:{label:'普通/CLUB-EST/Suica', bonus:10},
+    premium:{label:'CLUB-A以上/ゴールド/プラチナ', bonus:25},
+  };
+  const TIERS = [
+    {key:'general', label:'一般', fop:0},
+    {key:'crystal', label:'クリスタル', fop:30000},
+    {key:'sapphire', label:'サファイア', fop:50000},
+    {key:'jgcpremier', label:'JGCプレミア', fop:80000},
+    {key:'diamond', label:'ダイヤモンド', fop:100000},
+  ];
+
+  const DEFAULT_SETTINGS = {
+    memberName:'芳中敬吾', currentStatus:'crystal', card:'none',
+    baselineFOP:39180, baselineFlights:6, targetTier:'jgcpremier'
+  };
+
+  let flights = [];
+  let settings = Object.assign({}, DEFAULT_SETTINGS);
+  let lastResult = null;
+
+  // ---------- Storage (ブラウザのlocalStorageに保存。この端末のこのブラウザ内に残ります) ----------
+  const STORAGE_PREFIX = 'jal-fop-sim:';
+  const storage = {
+    get(key){
+      const v = localStorage.getItem(STORAGE_PREFIX + key);
+      return Promise.resolve(v === null ? null : {key, value:v});
+    },
+    set(key, value){
+      localStorage.setItem(STORAGE_PREFIX + key, value);
+      return Promise.resolve({key, value});
+    },
+  };
+  async function loadAll(){
+    try{
+      const r = await storage.get('flights');
+      flights = r ? JSON.parse(r.value) : [];
+    }catch(e){ flights = []; }
+    try{
+      const r = await storage.get('settings');
+      settings = r ? Object.assign({}, DEFAULT_SETTINGS, JSON.parse(r.value)) : Object.assign({}, DEFAULT_SETTINGS);
+    }catch(e){ settings = Object.assign({}, DEFAULT_SETTINGS); }
+  }
+  async function saveFlights(){
+    try{ await storage.set('flights', JSON.stringify(flights)); }catch(e){ showToast('保存に失敗しました'); }
+  }
+  async function saveSettings(){
+    try{ await storage.set('settings', JSON.stringify(settings)); }catch(e){ showToast('保存に失敗しました'); }
+  }
+
+  // ---------- Helpers ----------
+  function $(id){ return document.getElementById(id); }
+  function getMiles(a,b){
+    if(!a || !b || a===b) return null;
+    return SEGMENT_MILES[a+'-'+b] ?? SEGMENT_MILES[b+'-'+a] ?? null;
+  }
+  function airportName(code){
+    const f = AIRPORTS.find(x=>x.code===code);
+    return f ? f.name : code;
+  }
+  function showToast(msg){
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(()=>t.classList.remove('show'), 1800);
+  }
+  function fmt(n){ return Math.round(n).toLocaleString('ja-JP'); }
+
+  function calcResult(){
+    const from = $('fromAirport').value;
+    const to = $('toAirport').value;
+    const miles = parseFloat($('segMiles').value) || 0;
+    const seat = SEAT_CLASS[$('seatClass').value];
+    const fare = FARE_TYPE[$('fareType').value];
+    const status = STATUS[$('statusLv').value];
+    const card = CARD[$('cardLv').value];
+    const fareYen = parseFloat($('fareYen').value) || 0;
+
+    const baseRate = fare.base + seat.offset;
+    const flightMiles = miles * baseRate/100;
+    const bonusRate = Math.max(status.bonus, card.bonus);
+    const bonusMiles = miles * bonusRate/100;
+    const totalMiles = flightMiles + bonusMiles;
+
+    // FOP = 区間マイル×2(国内線)×積算率(運賃区分+座席クラス) + 搭乗ボーナスFOP(運賃区分で固定)
+    // ※羽田発FOP一覧の実測値(全区分・全座席クラス・4空港)と照合し一致を確認した式
+    const baseFOP = miles * 2 * baseRate/100;
+    const bonusFOP = parseFloat($('bonusFOPInput').value) || 0;
+    const totalFOP = baseFOP + bonusFOP;
+
+    // 国内線1搭乗＝5LSP（国際線は区間マイル1,000ごとに5LSP、本アプリは国内線基準）
+    const lsp = miles > 0 ? 5 : 0;
+
+    return {
+      from, to, miles,
+      seatLabel:seat.label, fareLabel:fare.label, statusLabel:status.label, cardLabel:card.label,
+      baseRate, bonusRate,
+      flightMiles, bonusMiles, totalMiles,
+      baseFOP, bonusFOP, totalFOP,
+      lsp, fareYen,
+      flightNo: $('flightNo').value.trim(),
+      date: $('flightDate').value || new Date().toISOString().slice(0,10),
+    };
+  }
+
+  function tierForFOP(fop){
+    let current = TIERS[0];
+    for(const t of TIERS){ if(fop >= t.fop) current = t; }
+    return current;
+  }
+  function nextTier(currentKey){
+    const idx = TIERS.findIndex(t=>t.key===currentKey);
+    return TIERS[idx+1] || null;
+  }
+
+  // ---------- Render: calc form ----------
+  function populateAirportSelects(){
+    const opts = AIRPORTS.map(a=>`<option value="${a.code}">${a.name}</option>`).join('');
+    $('fromAirport').innerHTML = opts;
+    $('toAirport').innerHTML = opts;
+    $('fromAirport').value = 'HND';
+    $('toAirport').value = 'OKA';
+  }
+  function updateSegMiles(){
+    const from = $('fromAirport').value, to = $('toAirport').value;
+    const m = getMiles(from, to);
+    const hint = $('segMilesHint');
+    if(m != null){
+      $('segMiles').value = m;
+      hint.textContent = `${airportName(from)} ⇄ ${airportName(to)}：区間マイル ${m}（JAL公式区間マイル表より）`;
+      hint.classList.remove('warn');
+    } else {
+      $('segMiles').value = '';
+      hint.textContent = 'この区間のマイルはデータにありません。区間マイルを手動で入力してください。';
+      hint.classList.add('warn');
+    }
+  }
+
+  function updateBonusFOPField(){
+    const fare = FARE_TYPE[$('fareType').value];
+    $('bonusFOPInput').value = fare.fopBonus;
+  }
+
+  function renderResult(r){
+    lastResult = r;
+    $('resultCard').style.display = 'block';
+    $('resMile').innerHTML = fmt(r.totalMiles) + '<small>マイル</small>';
+    $('resMileBreak').textContent = `フライトマイル：${fmt(r.flightMiles)}（積算率${r.baseRate}%）　ボーナス：+${fmt(r.bonusMiles)}`;
+    $('resFOP').innerHTML = fmt(r.totalFOP) + '<small>FOP</small>';
+    $('resFOPBreak').textContent = `ベースFOP：${fmt(r.baseFOP)}　ボーナス：+${fmt(r.bonusFOP)}`;
+    $('resLSP').textContent = r.lsp;
+
+    if(r.fareYen > 0){
+      $('priceBox').style.display = 'block';
+      const mileYen = (r.fareYen / r.totalMiles).toFixed(1);
+      const fopYen = (r.fareYen / r.totalFOP).toFixed(1);
+      $('resPrice').textContent = `${mileYen}円 / ${fopYen}円`;
+    } else {
+      $('priceBox').style.display = 'none';
+    }
+
+    // progress preview using current cumulative + this flight
+    const curTotal = cumulativeFOP() ; // before adding this one (not yet saved)
+    const projected = curTotal + r.totalFOP;
+    const target = TIERS.find(t=>t.key===settings.targetTier) || TIERS[TIERS.length-1];
+    const pct = Math.min(100, Math.round(projected/target.fop*100));
+    $('progTierLabel').textContent = `${target.label}達成まで（保存後の想定）`;
+    $('progPercent').textContent = pct + '%';
+    $('progFill').style.width = pct + '%';
+    const remain = Math.max(0, target.fop - projected);
+    $('progRemain').textContent = remain > 0 ? `残り ${fmt(remain)} FOP` : `🎉 ${target.label}の基準を達成見込みです`;
+
+    document.getElementById('resultCard').scrollIntoView({behavior:'smooth', block:'nearest'});
+  }
+
+  function cumulativeFOP(){
+    return settings.baselineFOP + flights.reduce((s,f)=>s+f.totalFOP,0);
+  }
+  function cumulativeFlights(){
+    return settings.baselineFlights + flights.length;
+  }
+  function cumulativeMiles(){
+    return flights.reduce((s,f)=>s+f.totalMiles,0);
+  }
+
+  // ---------- Progress view ----------
+  function renderProgress(){
+    $('progTotalFOP').textContent = fmt(cumulativeFOP());
+    $('progTotalFlights').textContent = cumulativeFlights();
+    $('targetTier').value = settings.targetTier;
+
+    const total = cumulativeFOP();
+    const target = TIERS.find(t=>t.key===settings.targetTier) || TIERS[TIERS.length-1];
+    const pct = Math.min(100, Math.round(total/target.fop*100));
+    $('mainProgLabel').textContent = `${target.label}達成まで`;
+    $('mainProgPercent').textContent = pct + '%';
+    $('mainProgFill').style.width = pct + '%';
+    const remain = Math.max(0, target.fop - total);
+    $('mainProgRemain').textContent = remain > 0 ? `残り ${fmt(remain)} FOP` : `🎉 ${target.label}の基準を達成しています`;
+
+    const reachedTier = tierForFOP(total);
+    $('ladder').innerHTML = TIERS.map(t=>{
+      let cls = 'tier';
+      if(t.fop <= total) cls += ' reached';
+      if(t.key === reachedTier.key) cls += ' current';
+      return `<div class="${cls}">${t.label}<div class="fop">${t.fop.toLocaleString()}</div></div>`;
+    }).join('');
+
+    $('baselineFOP').value = settings.baselineFOP;
+    $('baselineFlights').value = settings.baselineFlights;
+    $('memberNameInput').value = settings.memberName;
+    $('currentStatusInput').value = settings.currentStatus;
+  }
+
+  function renderHeaderMember(){
+    $('memberNameDisplay').textContent = settings.memberName ? settings.memberName + '様' : 'ゲスト';
+    const labelMap = {general:'一般会員',jgc:'JGC',crystal:'クリスタル',sapphire:'サファイア',jgcpremier:'JGCプレミア',diamond:'ダイヤモンド'};
+    $('memberStatusTag').textContent = labelMap[settings.currentStatus] || settings.currentStatus;
+  }
+
+  // ---------- Log view ----------
+  function renderLog(){
+    $('logCount').textContent = flights.length;
+    $('logMiles').textContent = fmt(cumulativeMiles());
+    $('logFOP').textContent = fmt(flights.reduce((s,f)=>s+f.totalFOP,0));
+
+    const list = $('logList');
+    if(flights.length === 0){
+      list.innerHTML = '<div class="empty">まだフライト記録がありません。<br>「計算」タブで計算後、ログに保存してください。</div>';
+      return;
+    }
+    const sorted = [...flights].sort((a,b)=> b.date.localeCompare(a.date));
+    list.innerHTML = sorted.map(f=>`
+      <div class="flight-item">
+        <button class="del-btn" data-id="${f.id}">✕</button>
+        <div class="top">${f.date}${f.flightNo ? '　'+f.flightNo : ''}</div>
+        <div class="route">${airportName(f.from)} → ${airportName(f.to)}</div>
+        <div class="nums">
+          <div>マイル<b>${fmt(f.totalMiles)}</b></div>
+          <div>FOP<b>${fmt(f.totalFOP)}</b></div>
+          <div>LSP<b>${f.lsp}</b></div>
+        </div>
+      </div>
+    `).join('');
+
+    list.querySelectorAll('.del-btn').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const id = btn.getAttribute('data-id');
+        flights = flights.filter(f=>f.id !== id);
+        await saveFlights();
+        renderLog(); renderProgress();
+        showToast('削除しました');
+      });
+    });
+  }
+
+  // ---------- Tabs ----------
+  function switchView(name){
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    document.getElementById('view-'+name).classList.add('active');
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.view===name));
+    if(name==='progress') renderProgress();
+    if(name==='log') renderLog();
+  }
+
+  // ---------- CSV / JSON ----------
+  function download(filename, content, mime){
+    const blob = new Blob([content], {type:mime});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+  function exportCsv(){
+    const header = ['搭乗日','便名','出発地','目的地','座席クラス','運賃種別','ステータス','カード','区間マイル','獲得マイル','獲得FOP','LSP','運賃(円)'];
+    const rows = flights.map(f=>[
+      f.date, f.flightNo, airportName(f.from), airportName(f.to), f.seatLabel, f.fareLabel, f.statusLabel, f.cardLabel,
+      f.miles, Math.round(f.totalMiles), Math.round(f.totalFOP), f.lsp, f.fareYen || ''
+    ]);
+    const csv = '\uFEFF'+[header, ...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+    download('jal_flight_log.csv', csv, 'text/csv;charset=utf-8;');
+    showToast('CSVをダウンロードしました');
+  }
+  function exportJson(){
+    const data = JSON.stringify({flights, settings}, null, 2);
+    download('jal_shugyo_backup.json', data, 'application/json');
+    showToast('JSONをダウンロードしました');
+  }
+  function importJson(file){
+    const reader = new FileReader();
+    reader.onload = async (e)=>{
+      try{
+        const data = JSON.parse(e.target.result);
+        if(Array.isArray(data.flights)) flights = data.flights;
+        if(data.settings) settings = Object.assign({}, DEFAULT_SETTINGS, data.settings);
+        await saveFlights(); await saveSettings();
+        renderLog(); renderProgress(); renderHeaderMember();
+        showToast('読み込みました');
+      }catch(err){
+        showToast('読み込みに失敗しました');
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  // ---------- Init ----------
+  async function init(){
+    populateAirportSelects();
+    $('flightDate').value = new Date().toISOString().slice(0,10);
+
+    await loadAll();
+    $('statusLv').value = settings.currentStatus === 'jgcpremier' ? 'sapphire' : (STATUS[settings.currentStatus] ? settings.currentStatus : 'crystal');
+    $('cardLv').value = CARD[settings.card] ? settings.card : 'none';
+    renderHeaderMember();
+    updateSegMiles();
+    updateBonusFOPField();
+
+    document.querySelectorAll('.tab-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=>switchView(btn.dataset.view));
+    });
+
+    $('fromAirport').addEventListener('change', updateSegMiles);
+    $('toAirport').addEventListener('change', updateSegMiles);
+    $('fareType').addEventListener('change', updateBonusFOPField);
+    $('swapBtn').addEventListener('click', ()=>{
+      const f = $('fromAirport').value, t = $('toAirport').value;
+      $('fromAirport').value = t; $('toAirport').value = f;
+      updateSegMiles();
+    });
+
+    $('calcBtn').addEventListener('click', ()=>{
+      const r = calcResult();
+      if(!r.miles || r.miles <= 0){
+        showToast('区間マイルを入力してください');
+        return;
+      }
+      renderResult(r);
+    });
+
+    $('saveLogBtn').addEventListener('click', async ()=>{
+      if(!lastResult) return;
+      const entry = Object.assign({id: 'f'+Date.now()}, lastResult);
+      flights.push(entry);
+      await saveFlights();
+      showToast('フライトログに保存しました');
+      renderLog(); renderProgress();
+    });
+
+    $('targetTier').addEventListener('change', async ()=>{
+      settings.targetTier = $('targetTier').value;
+      await saveSettings();
+      renderProgress();
+    });
+
+    $('saveSettingsBtn').addEventListener('click', async ()=>{
+      settings.baselineFOP = parseFloat($('baselineFOP').value) || 0;
+      settings.baselineFlights = parseInt($('baselineFlights').value) || 0;
+      settings.memberName = $('memberNameInput').value.trim();
+      settings.currentStatus = $('currentStatusInput').value;
+      await saveSettings();
+      renderHeaderMember(); renderProgress();
+      showToast('設定を保存しました');
+    });
+
+    $('exportCsvBtn').addEventListener('click', exportCsv);
+    $('exportJsonBtn').addEventListener('click', exportJson);
+    $('importJsonFile').addEventListener('change', (e)=>{
+      if(e.target.files[0]) importJson(e.target.files[0]);
+    });
+    $('clearLogBtn').addEventListener('click', async ()=>{
+      if(confirm('フライトログをすべて削除します。よろしいですか？')){
+        flights = [];
+        await saveFlights();
+        renderLog(); renderProgress();
+        showToast('削除しました');
+      }
+    });
+
+    renderProgress();
+    renderLog();
+  }
+
+  init();
+
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', ()=>{
+      navigator.serviceWorker.register('service-worker.js').catch(()=>{});
+    });
+  }
+})();
+</script>
+</body>
+</html>
