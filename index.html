@@ -166,10 +166,77 @@
   }
   .toast.show{ opacity:1; }
   .field-note{ font-size:11px; color:var(--muted); margin-bottom:8px; }
+
+  #onboardOverlay{
+    position:fixed; inset:0; z-index:100; background:rgba(9,16,38,.72);
+    display:flex; align-items:center; justify-content:center; padding:20px;
+    -webkit-backdrop-filter:blur(2px); backdrop-filter:blur(2px);
+  }
+  .onboard-card{
+    background:#fff; border-radius:16px; padding:22px 20px; width:100%; max-width:400px;
+    max-height:88vh; overflow-y:auto; box-shadow:0 10px 40px rgba(0,0,0,.35);
+  }
+
+  .flight-item.planned{ border-style:dashed; background:#FFFBF0; }
+  .status-badge{
+    display:inline-block; font-size:10px; font-weight:700; padding:2px 8px; border-radius:20px;
+    margin-left:6px; vertical-align:middle;
+  }
+  .status-badge.planned{ background:#FDF0D5; color:#8A6210; border:1px solid #EFD79E; }
+  .status-badge.done{ background:#E4F5EA; color:var(--good); border:1px solid #BFE3CB; }
+  .mark-done-btn{
+    margin-top:8px; width:100%; padding:8px; border-radius:8px; border:1px solid var(--gold);
+    background:#FFF8EB; color:#8A6210; font-size:12px; font-weight:700; cursor:pointer; font-family:inherit;
+  }
 </style>
 </head>
 <body>
 <div id="app">
+
+  <!-- ONBOARDING OVERLAY -->
+  <div id="onboardOverlay" style="display:none;">
+    <div class="onboard-card">
+      <div class="eyebrow" style="color:var(--gold); font-size:11px; letter-spacing:.1em; font-weight:700;">ようこそ</div>
+      <h2 style="margin:6px 0 4px; color:var(--navy); font-size:19px;">はじめに、現在の状況を教えてください</h2>
+      <div class="field-note">あとから「進捗」タブでいつでも変更できます。</div>
+
+      <label>お名前（任意）</label>
+      <input type="text" id="ob_memberName" placeholder="例）山田太郎">
+
+      <label>現在の会員ステータス</label>
+      <select id="ob_currentStatus">
+        <option value="general">一般会員</option>
+        <option value="jgc">JGC</option>
+        <option value="crystal">クリスタル</option>
+        <option value="sapphire">サファイア</option>
+        <option value="jgcpremier">JGCプレミア</option>
+        <option value="diamond">ダイヤモンド</option>
+      </select>
+
+      <div class="row2">
+        <div>
+          <label>現在の累計FOP</label>
+          <input type="number" id="ob_baselineFOP" placeholder="0">
+        </div>
+        <div>
+          <label>現在の搭乗回数</label>
+          <input type="number" id="ob_baselineFlights" placeholder="0">
+        </div>
+      </div>
+      <label>現在の累計LSP（任意）</label>
+      <input type="number" id="ob_baselineLSP" placeholder="0">
+
+      <label>目標ステータス</label>
+      <select id="ob_targetTier">
+        <option value="crystal">クリスタル（30,000 FOP）</option>
+        <option value="sapphire">サファイア（50,000 FOP）</option>
+        <option value="jgcpremier" selected>JGCプレミア（80,000 FOP）</option>
+        <option value="diamond">ダイヤモンド（100,000 FOP）</option>
+      </select>
+
+      <button class="btn btn-primary" id="ob_startBtn" style="margin-top:16px;">はじめる</button>
+    </div>
+  </div>
 
   <header>
     <div class="eyebrow">JAL FLY ON POINT SIMULATOR</div>
@@ -258,6 +325,12 @@
           <input type="date" id="flightDate">
         </div>
       </div>
+      <label>この記録のステータス</label>
+      <select id="flightStatus">
+        <option value="planned">予定（まだ搭乗していない）</option>
+        <option value="done">搭乗済み</option>
+      </select>
+      <div class="hint">予定はFOP見込みとして表示され、実績の累計には加算されません。搭乗後に「進捗」または「ログ」タブから搭乗済みに切り替えられます。</div>
     </div>
 
     <button class="btn btn-primary" id="calcBtn">計算する</button>
@@ -293,10 +366,11 @@
   <!-- PROGRESS VIEW -->
   <div class="view" id="view-progress">
     <div class="card">
-      <h2>📊 年間FOP進捗</h2>
+      <h2>📊 年間FOP進捗（実績）</h2>
       <div class="mini-row">
         <div class="mini"><div class="lbl">累計FOP</div><div class="val" id="progTotalFOP">0</div></div>
         <div class="mini"><div class="lbl">累計搭乗回数</div><div class="val" id="progTotalFlights">0</div></div>
+        <div class="mini"><div class="lbl">累計LSP</div><div class="val" id="progTotalLSP">0</div></div>
       </div>
       <label>目標ステータス</label>
       <select id="targetTier">
@@ -311,6 +385,7 @@
         <div class="hint" id="mainProgRemain"></div>
       </div>
       <div class="ladder" id="ladder"></div>
+      <div class="hint" id="plannedNote" style="margin-top:10px;"></div>
     </div>
 
     <div class="card">
@@ -326,6 +401,8 @@
           <input type="number" id="baselineFlights">
         </div>
       </div>
+      <label>ベースLSP</label>
+      <input type="number" id="baselineLSP">
       <label>会員名（任意）</label>
       <input type="text" id="memberNameInput">
       <label>現在のステータス</label>
@@ -450,8 +527,8 @@
   ];
 
   const DEFAULT_SETTINGS = {
-    memberName:'芳中敬吾', currentStatus:'crystal', card:'none',
-    baselineFOP:39180, baselineFlights:6, targetTier:'jgcpremier'
+    memberName:'', currentStatus:'general', card:'none',
+    baselineFOP:0, baselineFlights:0, baselineLSP:0, targetTier:'jgcpremier'
   };
 
   let flights = [];
@@ -470,6 +547,7 @@
       return Promise.resolve({key, value});
     },
   };
+  let isFirstRun = false;
   async function loadAll(){
     try{
       const r = await storage.get('flights');
@@ -477,8 +555,9 @@
     }catch(e){ flights = []; }
     try{
       const r = await storage.get('settings');
+      isFirstRun = !r;
       settings = r ? Object.assign({}, DEFAULT_SETTINGS, JSON.parse(r.value)) : Object.assign({}, DEFAULT_SETTINGS);
-    }catch(e){ settings = Object.assign({}, DEFAULT_SETTINGS); }
+    }catch(e){ settings = Object.assign({}, DEFAULT_SETTINGS); isFirstRun = true; }
   }
   async function saveFlights(){
     try{ await storage.set('flights', JSON.stringify(flights)); }catch(e){ showToast('保存に失敗しました'); }
@@ -538,6 +617,7 @@
       baseFOP, bonusFOP, totalFOP,
       lsp, fareYen,
       flightNo: $('flightNo').value.trim(),
+      status: $('flightStatus').value,
       date: $('flightDate').value || new Date().toISOString().slice(0,10),
     };
   }
@@ -602,30 +682,49 @@
     const curTotal = cumulativeFOP() ; // before adding this one (not yet saved)
     const projected = curTotal + r.totalFOP;
     const target = TIERS.find(t=>t.key===settings.targetTier) || TIERS[TIERS.length-1];
-    const pct = Math.min(100, Math.round(projected/target.fop*100));
-    $('progTierLabel').textContent = `${target.label}達成まで（保存後の想定）`;
+    const isPlanned = r.status === 'planned';
+    const pct = Math.min(100, Math.round((isPlanned ? curTotal : projected)/target.fop*100));
+    $('progTierLabel').textContent = isPlanned
+      ? `${target.label}達成まで（この予定分は見込みで、保存しても実績には加算されません）`
+      : `${target.label}達成まで（保存後の想定）`;
     $('progPercent').textContent = pct + '%';
     $('progFill').style.width = pct + '%';
-    const remain = Math.max(0, target.fop - projected);
-    $('progRemain').textContent = remain > 0 ? `残り ${fmt(remain)} FOP` : `🎉 ${target.label}の基準を達成見込みです`;
+    const shown = isPlanned ? curTotal : projected;
+    const remain = Math.max(0, target.fop - shown);
+    $('progRemain').textContent = remain > 0
+      ? `残り ${fmt(remain)} FOP${isPlanned ? `（この便のFOP+${fmt(r.totalFOP)}を搭乗後に反映すると 残り${fmt(Math.max(0,target.fop-projected))} FOP）` : ''}`
+      : `🎉 ${target.label}の基準を達成見込みです`;
 
     document.getElementById('resultCard').scrollIntoView({behavior:'smooth', block:'nearest'});
   }
 
+  // 搭乗済み扱い：status==='done'、または旧データでstatus未設定のもの（後方互換）
+  function isDone(f){ return f.status !== 'planned'; }
+
   function cumulativeFOP(){
-    return settings.baselineFOP + flights.reduce((s,f)=>s+f.totalFOP,0);
+    return settings.baselineFOP + flights.filter(isDone).reduce((s,f)=>s+f.totalFOP,0);
   }
   function cumulativeFlights(){
-    return settings.baselineFlights + flights.length;
+    return settings.baselineFlights + flights.filter(isDone).length;
   }
   function cumulativeMiles(){
-    return flights.reduce((s,f)=>s+f.totalMiles,0);
+    return flights.filter(isDone).reduce((s,f)=>s+f.totalMiles,0);
+  }
+  function cumulativeLSP(){
+    return (settings.baselineLSP||0) + flights.filter(isDone).reduce((s,f)=>s+f.lsp,0);
+  }
+  function plannedFOPTotal(){
+    return flights.filter(f=>!isDone(f)).reduce((s,f)=>s+f.totalFOP,0);
+  }
+  function projectedFOP(){
+    return cumulativeFOP() + plannedFOPTotal();
   }
 
   // ---------- Progress view ----------
   function renderProgress(){
     $('progTotalFOP').textContent = fmt(cumulativeFOP());
     $('progTotalFlights').textContent = cumulativeFlights();
+    $('progTotalLSP').textContent = fmt(cumulativeLSP());
     $('targetTier').value = settings.targetTier;
 
     const total = cumulativeFOP();
@@ -645,8 +744,18 @@
       return `<div class="${cls}">${t.label}<div class="fop">${t.fop.toLocaleString()}</div></div>`;
     }).join('');
 
+    const planned = plannedFOPTotal();
+    if(planned > 0){
+      const projected = projectedFOP();
+      const projPct = Math.min(100, Math.round(projected/target.fop*100));
+      $('plannedNote').textContent = `📋 予定分（未搭乗）+${fmt(planned)} FOPを含めた見込み：${fmt(projected)} FOP（${projPct}%）`;
+    } else {
+      $('plannedNote').textContent = '';
+    }
+
     $('baselineFOP').value = settings.baselineFOP;
     $('baselineFlights').value = settings.baselineFlights;
+    $('baselineLSP').value = settings.baselineLSP || 0;
     $('memberNameInput').value = settings.memberName;
     $('currentStatusInput').value = settings.currentStatus;
   }
@@ -659,9 +768,9 @@
 
   // ---------- Log view ----------
   function renderLog(){
-    $('logCount').textContent = flights.length;
+    $('logCount').textContent = flights.filter(isDone).length;
     $('logMiles').textContent = fmt(cumulativeMiles());
-    $('logFOP').textContent = fmt(flights.reduce((s,f)=>s+f.totalFOP,0));
+    $('logFOP').textContent = fmt(flights.filter(isDone).reduce((s,f)=>s+f.totalFOP,0));
 
     const list = $('logList');
     if(flights.length === 0){
@@ -669,18 +778,23 @@
       return;
     }
     const sorted = [...flights].sort((a,b)=> b.date.localeCompare(a.date));
-    list.innerHTML = sorted.map(f=>`
-      <div class="flight-item">
+    list.innerHTML = sorted.map(f=>{
+      const planned = !isDone(f);
+      return `
+      <div class="flight-item ${planned?'planned':''}">
         <button class="del-btn" data-id="${f.id}">✕</button>
-        <div class="top">${f.date}${f.flightNo ? '　'+f.flightNo : ''}</div>
+        <div class="top">${f.date}${f.flightNo ? '　'+f.flightNo : ''}
+          <span class="status-badge ${planned?'planned':'done'}">${planned?'予定':'搭乗済み'}</span>
+        </div>
         <div class="route">${airportName(f.from)} → ${airportName(f.to)}</div>
         <div class="nums">
           <div>マイル<b>${fmt(f.totalMiles)}</b></div>
           <div>FOP<b>${fmt(f.totalFOP)}</b></div>
           <div>LSP<b>${f.lsp}</b></div>
         </div>
+        ${planned ? `<button class="mark-done-btn" data-id="${f.id}">✅ 搭乗済みにする</button>` : ''}
       </div>
-    `).join('');
+    `;}).join('');
 
     list.querySelectorAll('.del-btn').forEach(btn=>{
       btn.addEventListener('click', async ()=>{
@@ -689,6 +803,13 @@
         await saveFlights();
         renderLog(); renderProgress();
         showToast('削除しました');
+      });
+    });
+    list.querySelectorAll('.mark-done-btn').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const id = btn.getAttribute('data-id');
+        const f = flights.find(x=>x.id === id);
+        if(f){ f.status = 'done'; await saveFlights(); renderLog(); renderProgress(); showToast('搭乗済みにしました。実績に反映されました'); }
       });
     });
   }
@@ -713,8 +834,9 @@
     URL.revokeObjectURL(url);
   }
   function exportCsv(){
-    const header = ['搭乗日','便名','出発地','目的地','座席クラス','運賃種別','ステータス','カード','区間マイル','獲得マイル','獲得FOP','LSP','運賃(円)'];
+    const header = ['記録区分','搭乗日','便名','出発地','目的地','座席クラス','運賃種別','会員ステータス','カード','区間マイル','獲得マイル','獲得FOP','LSP','運賃(円)'];
     const rows = flights.map(f=>[
+      isDone(f) ? '搭乗済み' : '予定',
       f.date, f.flightNo, airportName(f.from), airportName(f.to), f.seatLabel, f.fareLabel, f.statusLabel, f.cardLabel,
       f.miles, Math.round(f.totalMiles), Math.round(f.totalFOP), f.lsp, f.fareYen || ''
     ]);
@@ -750,11 +872,29 @@
     $('flightDate').value = new Date().toISOString().slice(0,10);
 
     await loadAll();
-    $('statusLv').value = settings.currentStatus === 'jgcpremier' ? 'sapphire' : (STATUS[settings.currentStatus] ? settings.currentStatus : 'crystal');
+    $('statusLv').value = settings.currentStatus === 'jgcpremier' ? 'sapphire' : (STATUS[settings.currentStatus] ? settings.currentStatus : 'general');
     $('cardLv').value = CARD[settings.card] ? settings.card : 'none';
     renderHeaderMember();
     updateSegMiles();
     updateBonusFOPField();
+
+    if(isFirstRun){
+      $('onboardOverlay').style.display = 'flex';
+    }
+    $('ob_startBtn').addEventListener('click', async ()=>{
+      settings.memberName = $('ob_memberName').value.trim();
+      settings.currentStatus = $('ob_currentStatus').value;
+      settings.baselineFOP = parseFloat($('ob_baselineFOP').value) || 0;
+      settings.baselineFlights = parseInt($('ob_baselineFlights').value) || 0;
+      settings.baselineLSP = parseFloat($('ob_baselineLSP').value) || 0;
+      settings.targetTier = $('ob_targetTier').value;
+      await saveSettings();
+      isFirstRun = false;
+      $('onboardOverlay').style.display = 'none';
+      renderHeaderMember(); renderProgress();
+      $('statusLv').value = STATUS[settings.currentStatus] ? settings.currentStatus : 'general';
+      showToast('登録しました。ようこそ！');
+    });
 
     document.querySelectorAll('.tab-btn').forEach(btn=>{
       btn.addEventListener('click', ()=>switchView(btn.dataset.view));
@@ -796,6 +936,7 @@
     $('saveSettingsBtn').addEventListener('click', async ()=>{
       settings.baselineFOP = parseFloat($('baselineFOP').value) || 0;
       settings.baselineFlights = parseInt($('baselineFlights').value) || 0;
+      settings.baselineLSP = parseFloat($('baselineLSP').value) || 0;
       settings.memberName = $('memberNameInput').value.trim();
       settings.currentStatus = $('currentStatusInput').value;
       await saveSettings();
